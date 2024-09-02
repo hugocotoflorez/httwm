@@ -14,12 +14,15 @@ typedef struct
 
 typedef struct
 {
+    // Assign by user
     char     *title;
     Vec2d     position;
     Vec2d     dimension;
+    // Assign by program
     pthread_t win_thread;
-    bool      active;
     uint8_t   refresh_rate;
+    bool      active;
+    int       pipe[2];
 
 } Window;
 

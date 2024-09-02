@@ -1,43 +1,68 @@
 #include "interface.h"
+#include "window.h"
 #include <assert.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <termios.h>
 #include <unistd.h>
 
+static struct termios origin_termios;
 
 void
-command_to_file(const char *filename, char *command[const])
+disableRawMode()
 {
-    pid_t out;
-    pid_t save_out;
-    pid_t proc;
-    int   errcode;
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &origin_termios);
+}
 
-    assert(command && command[0]);
+void
+enableRawMode()
+{
+    tcgetattr(STDIN_FILENO, &origin_termios);
+    struct termios raw;
+    raw.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP);
+    raw.c_iflag &= ~(INLCR | IGNCR | ICRNL | IXON);
+    raw.c_oflag &= ~(OPOST);
+    raw.c_cflag |= (CS8);
+    raw.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
+    raw.c_cflag &= ~(CSIZE | PARENB);
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+}
 
-    out = open(filename, O_RDWR | O_CREAT, 0600);
-    assert(out >= 0);
-
-    save_out = dup(fileno(stdout));
-    errcode  = dup2(out, fileno(stdout));
-    assert(errcode >= 0);
-
-    proc = fork();
-    assert(proc >= 0);
-
-    if (!proc) // child
+void
+command_to_file(int fd, char *command[const])
+{
+    if (dup2(fd, STDOUT_FILENO) >= 0)
+    {
+        close(fd);
         execvp(command[0], command);
+    }
+}
 
-    fflush(stdout);
-    close(out);
-    dup2(save_out, fileno(stdout));
-    close(save_out);
+void
+run_command(Window win, char *command[const])
+{
+    if (!fork()) // child
+    {
+        command_to_file(win.pipe[0], command);
+        return;
+    }
 }
 
 int
-main()
+main(int argc, char **argv)
 {
-    char *args[] = { "nvim", "." };
-    command_to_file("ls.txt", args);
+    enableRawMode();
+
+    int    fd = open("out.txt", O_RDWR | O_CREAT | O_APPEND, 0600);
+    Window win;
+    win.pipe[0] = fd;
+
+    if (argc > 1)
+    {
+        run_command(win, argv + 1);
+    }
+
+
+    disableRawMode();
     return 0;
 }

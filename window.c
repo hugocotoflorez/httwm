@@ -79,11 +79,21 @@ window_loop(void *args)
 void
 window_create(Window win)
 {
-    Window *winptr = malloc(sizeof(win));
+    int     status;
+    Window *winptr;
+
+    winptr = malloc(sizeof(win));
     assert(winptr);
+
     *winptr = win;
+
     pthread_create(&winptr->win_thread, NULL, window_loop, winptr);
     pthread_mutex_lock(&arraylist_lock);
     arraylist_append(&windows_array, winptr);
     pthread_mutex_unlock(&arraylist_lock);
+
+    status = pipe(win.pipe);
+    assert(!status);
+
+    win.active = true;
 }
