@@ -1,5 +1,6 @@
-#include "window.h" // Window
+#include "term.h"   // Window
 #include <stddef.h> // size_t
+#include <pthread.h>
 
 /* As this is going to be used for a few
  * elements, once the array grows it only
@@ -8,12 +9,13 @@
 #define ELEM_ERR     0;
 
 // type declarations
-typedef Window *element_t;
+typedef Term *element_t;
 typedef struct __araylist
 {
-    element_t **data;
-    size_t      capacity;
-    size_t      length;
+    element_t     **data;
+    size_t          capacity;
+    size_t          length;
+    pthread_mutex_t lock;
 } Arraylist;
 
 // ---------- function declarations ---------- //
@@ -31,3 +33,5 @@ element_t arraylist_remove(Arraylist *arraylist, size_t index);
 element_t arraylist_get(Arraylist arraylist, size_t index);
 // just for 'debugging'
 void arraylist_print(Arraylist arraylist);
+// get length
+size_t arraylist_length(Arraylist arraylist);
