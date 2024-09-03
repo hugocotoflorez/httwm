@@ -1,6 +1,0 @@
-#ifndef HTTWM_KEYBOARD_H
-#define HTTWM_KEYBOARD_H
-
-
-
-#endif // HTTWM_KEYBOARD_H
