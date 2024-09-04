@@ -1,5 +1,6 @@
 #include "term.h"
 #include "arraylist.h"
+#include "termstuff.h"
 #include <assert.h>
 #include <poll.h>
 #include <pthread.h>
@@ -18,9 +19,6 @@
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
-
-#define SHELL       "zsh"
-#define BUFFER_SIZE 1024
 
 static Arraylist term_array = { 0 };
 
@@ -65,10 +63,17 @@ term_create()
     term->fd     = -1;
     term->active = false;
 
-    term->size.ws_col    = screen.cols;
-    term->size.ws_row    = screen.rows;
+    term->size.ws_col =
+    screen.cols - (BORDER_SIZE * 2 * (1 + BORDER_DOUBLE_VERTICAL));
+    term->size.ws_row = screen.rows - BORDER_SIZE * 2; // fullscreen with borders
     term->size.ws_xpixel = 0;
     term->size.ws_ypixel = 0;
+
+    term->position.i = 1 + BORDER_SIZE;
+    term->position.j = 1 + BORDER_SIZE + BORDER_DOUBLE_VERTICAL;
+
+    term->cursor.i = 0;
+    term->cursor.j = 0;
 
     status = forkpty(&term->fd, NULL, &term->opts, &term->size);
 
@@ -86,16 +91,18 @@ term_create()
     set_raw_mode(term->fd, &origin_termios[0]);
 
     active_term_n = arraylist_append(&term_array, term);
+    printf("Term size: %dx%d at %d %d\n", term->size.ws_col,
+           term->size.ws_row, term->position.i, term->position.j);
     printf("Active term: %d\n", active_term_n);
 }
 
 void
-handle_read(int fd)
+handle_read(Term *term)
 {
     char    buff[BUFFER_SIZE];
     ssize_t status;
 
-    status = read(fd, buff, sizeof(buff) - 1);
+    status = read(term->fd, buff, sizeof(buff) - 1);
 
     if (status < 0)
         exit(EXIT_FAILURE);
@@ -103,7 +110,15 @@ handle_read(int fd)
     if (status)
     {
         buff[status] = '\0';
+
+        /*TODO: handle scape sequences
+         * howto: if buff have a \033 it may
+         * be a start of a escape sequence, so
+         * handle it and transform with the needed
+         * offset.
+         */
         printf("%s", buff);
+
         fflush(stdout);
     }
     else // fd closed
@@ -133,7 +148,7 @@ output_handler()
             for (int i = 0; i < pty_n; i++)
             {
                 if (fds[i].revents & (POLLIN | POLLERR | POLLHUP))
-                    handle_read(fds[i].fd);
+                    handle_read(arraylist_get(term_array, i));
             }
         else
             perror("poll");
